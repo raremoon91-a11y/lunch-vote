@@ -81,19 +81,35 @@ function App() {
   // 2. 지도 초기화
   // =====================================================
   useEffect(() => {
-    if (view === 'admin' && isMapLoaded && !mapInstance.current && mapRef.current) {
-      const companyPosition = new window.kakao.maps.LatLng(COMPANY_LAT, COMPANY_LNG)
-      const map = new window.kakao.maps.Map(mapRef.current, { center: companyPosition, level: 4 })
-      mapInstance.current = map
+      if (view === 'admin' && isMapLoaded && mapRef.current) {
+        
+        // CSS 렌더링이 완료될 수 있도록 0.1초(100ms) 여유를 줍니다.
+        setTimeout(() => {
+          if (!mapRef.current) return; // 그 찰나에 화면을 벗어나면 실행 안 함
+          
+          if (!mapInstance.current) {
+            const companyPosition = new window.kakao.maps.LatLng(COMPANY_LAT, COMPANY_LNG)
+            const map = new window.kakao.maps.Map(mapRef.current, { center: companyPosition, level: 4 })
+            mapInstance.current = map
 
-      const companyMarkerContent = `<div style="padding:3px 6px; background:red; color:white; border-radius:4px; font-size:12px; font-weight:bold;">회사</div>`
-      const companyOverlay = new window.kakao.maps.CustomOverlay({
-        position: companyPosition, content: companyMarkerContent, xAnchor: 0, yAnchor: 0.5
-      })
-      companyOverlay.setMap(map)
-      placesService.current = new window.kakao.maps.services.Places()
-    }
-  }, [view, isMapLoaded])
+            const companyMarkerContent = `<div style="padding:3px 6px; background:red; color:white; border-radius:4px; font-size:12px; font-weight:bold;">회사</div>`
+            const companyOverlay = new window.kakao.maps.CustomOverlay({
+              position: companyPosition, content: companyMarkerContent, xAnchor: 0, yAnchor: 0.5
+            })
+            companyOverlay.setMap(map)
+            placesService.current = new window.kakao.maps.services.Places()
+          } else {
+            // 이미 맵 객체가 있다면 크기를 강제로 재계산해서 회색 화면을 덮어씌움
+            mapInstance.current.relayout();
+            mapInstance.current.setCenter(new window.kakao.maps.LatLng(COMPANY_LAT, COMPANY_LNG));
+          }
+        }, 100);
+        
+      } else if (view !== 'admin') {
+        // 다른 화면(투표 화면)으로 넘어가면 지도 객체를 초기화하여 나중에 돌아올 때 꼬이지 않게 함
+        mapInstance.current = null;
+      }
+    }, [view, isMapLoaded])
 
   // =====================================================
   // 3. 관리자 화면 기능
