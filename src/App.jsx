@@ -403,22 +403,34 @@ function App() {
                       <p className="address">📍 {place.road_address_name || place.address_name}</p>
                       <p className="distance">🏢 회사에서 {formatDistance(place.distance)}</p>
                       
-                      <div className="place-actions" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
-                        <button onClick={() => showPlaceInfo(place)} style={{ flex: '1 1 45%' }}>상세 보기</button>
+                      <div className="place-actions" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
+  
+                        {/* 1. 가장 중요한 등록/해제 버튼을 크고 넓게 1순위로 배치 */}
                         <button 
                           onClick={() => toggleFavorite(place)}
-                          style={{ flex: '1 1 45%', background: isFav ? '#ff9800' : '#4caf50', color: '#fff' }}
+                          style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: 'bold', background: isFav ? '#ff9800' : '#4caf50', color: '#fff', border: 'none', borderRadius: '8px' }}
                         >
                           {isFav ? '❌ 즐겨찾기 해제' : '⭐ 등록하기'}
                         </button>
-                        {isFav && (
+
+                        {/* 2. 상세보기와 메뉴 수정은 그 아래에 반반씩 큼직하게 배치 */}
+                        <div style={{ display: 'flex', gap: '10px' }}>
                           <button 
-                            onClick={() => editMenu(String(place.id), isFav.menu, place.place_name)} 
-                            style={{ flex: '1 1 100%', background: '#2196f3', color: 'white', padding: '8px' }}
+                            onClick={() => showPlaceInfo(place)} 
+                            style={{ flex: 1, padding: '12px', fontSize: '14px', fontWeight: 'bold', border: '1px solid #ddd', borderRadius: '8px', background: '#fafafa', color: '#333' }}
                           >
-                            ✏️ 대표 메뉴 수정
+                            🗺️ 상세 보기
                           </button>
-                        )}
+                          
+                          {isFav && (
+                            <button 
+                              onClick={() => editMenu(String(place.id), isFav.menu, place.place_name)} 
+                              style={{ flex: 1, padding: '12px', fontSize: '14px', fontWeight: 'bold', background: '#2196f3', color: 'white', border: 'none', borderRadius: '8px' }}
+                            >
+                              ✏️ 메뉴 수정
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
