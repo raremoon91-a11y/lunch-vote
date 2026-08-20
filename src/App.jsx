@@ -311,7 +311,7 @@ function App() {
             <div className="search-box" style={{ marginBottom: '12px' }}>
               <input
                 type="text"
-                placeholder="🔍 식당 이름이나 메뉴(제육, 돈까스 등)를 검색해보세요"
+                placeholder="🔍 식당 이름이나 메뉴를 검색해보세요"
                 value={voteKeyword}
                 onChange={(e) => setVoteKeyword(e.target.value)}
                 style={{ background: '#fff' }}
