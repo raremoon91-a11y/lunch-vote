@@ -4,8 +4,14 @@
 
 body {
   margin: 0;
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
-  background: #f7f9fa; /* 더 부드러운 배경색 */
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  background: #f7f9fa;
+  color: #111111;
+}
+
+/* 스마트폰 다크모드 시 제목 글자색 반전 방지 */
+h1, h2, h3, h4, h5, h6, p, span, label {
+  color: #111111;
 }
 
 button {
@@ -22,11 +28,17 @@ button:active {
   max-width: 1200px;
   margin: 0 auto;
   padding: 30px 20px;
+  color: #111111;
 }
 
-/* =========================================
-   검색 박스 (관리자 화면)
-========================================= */
+/* 모바일 인풋창 검은 배경/흰 글씨 현상 방지 (iOS 대응) */
+input[type="text"], input {
+  background-color: #ffffff !important;
+  color: #111111 !important;
+  -webkit-text-fill-color: #111111 !important;
+  opacity: 1;
+}
+
 .search-box {
   display: flex;
   gap: 10px;
@@ -41,11 +53,6 @@ button:active {
   font-size: 16px;
   outline: none;
   box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-  transition: border-color 0.2s;
-}
-
-.search-box input:focus {
-  border-color: #2196f3;
 }
 
 .search-box button {
@@ -55,19 +62,13 @@ button:active {
   font-size: 16px;
   font-weight: bold;
   background: #2196f3;
-  color: white;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
-.search-box button:hover {
-  background: #1976d2;
-}
-
-/* =========================================
-   콘텐츠 영역 (지도 + 리스트 분할)
-========================================= */
 .content {
   display: grid;
-  grid-template-columns: 1.5fr 1fr; /* 지도를 조금 더 크게 배치 */
+  grid-template-columns: 1.5fr 1fr;
   gap: 20px;
 }
 
@@ -80,37 +81,13 @@ button:active {
   border: 1px solid #e0e0e0;
 }
 
-/* =========================================
-   리스트 스크롤 영역
-========================================= */
 .results {
   height: 650px;
   overflow-y: auto;
   background: transparent;
-  padding-right: 8px; /* 스크롤바 여백 */
+  padding-right: 8px;
 }
 
-/* 스크롤바 커스텀 (크롬/사파리) */
-.results::-webkit-scrollbar {
-  width: 6px;
-}
-.results::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-.results::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 4px;
-}
-
-.results h2 {
-  margin-top: 0;
-  margin-bottom: 15px;
-}
-
-/* =========================================
-   관리자 검색 결과 카드 (.place)
-========================================= */
 .place {
   background: white;
   padding: 16px;
@@ -120,51 +97,22 @@ button:active {
   box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 
-.place h3 {
-  margin: 0 0 8px;
-  font-size: 17px;
+.place h3, .place p {
+  color: #111111;
 }
 
-.place p {
-  margin: 4px 0;
-  font-size: 13px;
-}
-
-.place .address {
-  color: #555;
-}
-
-.place .distance {
-  color: #333;
-}
-
-.place-actions button {
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  background: white;
-  color: #333;
-  font-weight: 500;
-}
-
-.place-actions button:hover {
-  filter: brightness(0.95);
-}
-
-/* =========================================
-   모바일 반응형 처리
-========================================= */
 @media (max-width: 900px) {
   .content {
-    grid-template-columns: 1fr; /* 모바일에서는 세로로 배치 */
+    grid-template-columns: 1fr;
   }
 
   .map {
-    height: 350px; /* 모바일 지도 높이 줄임 */
+    height: 350px;
   }
 
   .results {
     height: auto;
-    max-height: 500px; /* 모바일 스크롤 제한 */
+    max-height: 500px;
     margin-top: 10px;
     padding-right: 0;
   }
