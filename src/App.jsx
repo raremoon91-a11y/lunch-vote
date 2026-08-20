@@ -21,14 +21,13 @@ const getMyUserId = () => {
   return uid
 }
 
-// ✅ 매일 초기화를 위한 KST(한국시간) 기준 "오늘" 범위 계산
+// 매일 초기화를 위한 KST(한국시간) 기준 "오늘" 범위 계산
 const getKSTDayRange = () => {
   const now = new Date()
   const kstNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
   const year = kstNow.getFullYear()
   const month = kstNow.getMonth()
   const date = kstNow.getDate()
-  // KST 00:00 = UTC 전날 15:00 이므로 UTC 기준 시(hour)에 -9를 주면 JS가 알아서 날짜 보정을 해줌
   const startUTC = new Date(Date.UTC(year, month, date, -9, 0, 0))
   const endUTC = new Date(Date.UTC(year, month, date + 1, -9, 0, 0))
   return { start: startUTC.toISOString(), end: endUTC.toISOString() }
@@ -85,7 +84,7 @@ function App() {
     if (data) setFavorites(data)
   }
 
-  // ✅ 오늘(KST) 생성된 투표만 조회 → 자정이 지나면 자동으로 0표부터 다시 시작
+  // 오늘(KST) 생성된 투표만 조회 (자정이 지나면 자동으로 0표부터 시작)
   const fetchVotes = async () => {
     const { start, end } = getKSTDayRange()
     const { data } = await supabase
@@ -97,38 +96,33 @@ function App() {
   }
 
   // =====================================================
-  // 2. 지도 초기화
+  // 2. 지도 초기화 (회색 화면 방지 및 relayout 적용)
   // =====================================================
   useEffect(() => {
-      if (view === 'admin' && isMapLoaded && mapRef.current) {
+    if (view === 'admin' && isMapLoaded && mapRef.current) {
+      setTimeout(() => {
+        if (!mapRef.current) return;
         
-        // CSS 렌더링이 완료될 수 있도록 0.1초(100ms) 여유를 줍니다.
-        setTimeout(() => {
-          if (!mapRef.current) return; // 그 찰나에 화면을 벗어나면 실행 안 함
-          
-          if (!mapInstance.current) {
-            const companyPosition = new window.kakao.maps.LatLng(COMPANY_LAT, COMPANY_LNG)
-            const map = new window.kakao.maps.Map(mapRef.current, { center: companyPosition, level: 4 })
-            mapInstance.current = map
+        if (!mapInstance.current) {
+          const companyPosition = new window.kakao.maps.LatLng(COMPANY_LAT, COMPANY_LNG)
+          const map = new window.kakao.maps.Map(mapRef.current, { center: companyPosition, level: 4 })
+          mapInstance.current = map
 
-            const companyMarkerContent = `<div style="padding:3px 6px; background:red; color:white; border-radius:4px; font-size:12px; font-weight:bold;">회사</div>`
-            const companyOverlay = new window.kakao.maps.CustomOverlay({
-              position: companyPosition, content: companyMarkerContent, xAnchor: 0, yAnchor: 0.5
-            })
-            companyOverlay.setMap(map)
-            placesService.current = new window.kakao.maps.services.Places()
-          } else {
-            // 이미 맵 객체가 있다면 크기를 강제로 재계산해서 회색 화면을 덮어씌움
-            mapInstance.current.relayout();
-            mapInstance.current.setCenter(new window.kakao.maps.LatLng(COMPANY_LAT, COMPANY_LNG));
-          }
-        }, 100);
-        
-      } else if (view !== 'admin') {
-        // 다른 화면(투표 화면)으로 넘어가면 지도 객체를 초기화하여 나중에 돌아올 때 꼬이지 않게 함
-        mapInstance.current = null;
-      }
-    }, [view, isMapLoaded])
+          const companyMarkerContent = `<div style="padding:3px 6px; background:red; color:white; border-radius:4px; font-size:12px; font-weight:bold;">회사</div>`
+          const companyOverlay = new window.kakao.maps.CustomOverlay({
+            position: companyPosition, content: companyMarkerContent, xAnchor: 0, yAnchor: 0.5
+          })
+          companyOverlay.setMap(map)
+          placesService.current = new window.kakao.maps.services.Places()
+        } else {
+          mapInstance.current.relayout();
+          mapInstance.current.setCenter(new window.kakao.maps.LatLng(COMPANY_LAT, COMPANY_LNG));
+        }
+      }, 100);
+    } else if (view !== 'admin') {
+      mapInstance.current = null;
+    }
+  }, [view, isMapLoaded])
 
   // =====================================================
   // 3. 관리자 화면 기능
@@ -169,7 +163,7 @@ function App() {
     const address = place.road_address_name || place.address_name
     const infoContent = `
       <div style="width:240px; padding:15px; font-family:Arial,sans-serif;">
-        <div style="font-size:16px; font-weight:bold; margin-bottom:8px;">🍚 ${place.place_name}</div>
+        <div style="font-size:16px; font-weight:bold; margin-bottom:8px; color:#111;">🍚 ${place.place_name}</div>
         <div style="font-size:13px; color:#555; margin-bottom:10px;">📍 ${address}</div>
         ${place.place_url ? `<a href="${place.place_url}" target="_blank" rel="noopener noreferrer" style="display:block; padding:8px; background:#222; color:white; text-align:center; text-decoration:none; border-radius:6px; font-size:13px;">카카오맵 상세보기</a>` : ''}
       </div>
@@ -197,7 +191,7 @@ function App() {
     if (isFav) {
       removeFavorite(String(place.id))
     } else {
-      const menuInput = prompt(`[${place.place_name}]의 대표 메뉴를 입력해주세요!\n(예: 제육볶음, 돈까스 / 없으면 그냥 확인)`)
+      const menuInput = prompt(`[${place.place_name}]의 메뉴와 검색 태그를 쉼표(,)로 적어주세요!\n\n(예: 돈까스, 일식, 가성비)\n*첫 단어만 뱃지로 보이고 나머진 숨은 검색 태그가 됩니다.`)
       const menuText = menuInput ? menuInput.trim() : null
       const newFav = {
         place_id: String(place.id), place_name: place.place_name, address: place.road_address_name || place.address_name, category_name: place.category_name, distance: place.distance, menu: menuText 
@@ -215,7 +209,7 @@ function App() {
   }
 
   const editMenu = async (placeId, currentMenu, placeName) => {
-    const menuInput = prompt(`[${placeName}]의 새로운 대표 메뉴를 입력해주세요!`, currentMenu || '')
+    const menuInput = prompt(`[${placeName}]의 메뉴와 숨겨진 태그를 쉼표(,)로 적어주세요!\n(예: 제육볶음, 한식, 해장)`, currentMenu || '')
     if (menuInput !== null) {
       const menuText = menuInput.trim()
       await supabase.from('favorites').update({ menu: menuText }).eq('place_id', placeId)
@@ -254,22 +248,24 @@ function App() {
     ? favorites.filter(fav => voteCounts[fav.place_id] === maxVotes).map(fav => fav.place_name)
     : []
 
-  // ✅ 투표 화면: 검색어 필터링 + (1순위: 득표순, 2순위: 거리순) 정렬 적용
+  // 검색 필터(식당명 + 메뉴/태그 + 카테고리) 및 다중 정렬 (1순위: 득표수, 2순위: 거리)
   const displayedFavorites = favorites
-    .filter(fav => 
-      fav.place_name.includes(voteKeyword) || 
-      (fav.menu && fav.menu.includes(voteKeyword))
-    )
+    .filter(fav => {
+      const searchWord = voteKeyword.toLowerCase().trim()
+      if (!searchWord) return true
+      return (
+        fav.place_name.toLowerCase().includes(searchWord) || 
+        (fav.menu && fav.menu.toLowerCase().includes(searchWord)) ||
+        (fav.category_name && fav.category_name.toLowerCase().includes(searchWord))
+      )
+    })
     .sort((a, b) => {
       const aVotes = voteCounts[a.place_id] || 0
       const bVotes = voteCounts[b.place_id] || 0
       
-      // 1순위: 득표수가 다르면 득표수 높은 순(내림차순)
       if (aVotes !== bVotes) {
         return bVotes - aVotes
       }
-      
-      // 2순위: 득표수가 같으면 거리가 가까운 순(오름차순)
       return Number(a.distance) - Number(b.distance)
     })
 
@@ -283,7 +279,7 @@ function App() {
         <button 
           onClick={() => {
             setView(view === 'vote' ? 'admin' : 'vote');
-            setVoteKeyword(''); // 화면 전환 시 검색어 초기화
+            setVoteKeyword(''); 
           }}
           style={{ padding: '8px 12px', background: '#333', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
         >
@@ -306,12 +302,12 @@ function App() {
             </div>
           )}
 
-          {/* 투표 화면용 맛집/메뉴 검색창 */}
+          {/* 투표 화면용 검색창 */}
           {favorites.length > 0 && (
             <div className="search-box" style={{ marginBottom: '12px' }}>
               <input
                 type="text"
-                placeholder="🔍 식당 이름이나 메뉴를 검색해보세요"
+                placeholder="🔍 식당, 메뉴, 또는 태그(해장, 가성비 등) 검색"
                 value={voteKeyword}
                 onChange={(e) => setVoteKeyword(e.target.value)}
                 style={{ background: '#fff' }}
@@ -333,7 +329,6 @@ function App() {
           ) : (
             <div className="results" style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '10px' }}>
               
-              {/* 필터링 및 다중 정렬(득표순->거리순)된 리스트 출력 */}
               {displayedFavorites.map((fav) => {
                 const currentVotes = voteCounts[fav.place_id] || 0
                 const percentage = totalVotes > 0 ? Math.round((currentVotes / totalVotes) * 100) : 0
@@ -352,7 +347,9 @@ function App() {
                       <h3 style={{ margin: 0, fontSize: '15px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '5px' }}>
                         {fav.place_name}
                         {isFirstPlace && <span style={{ background: '#fff9c4', color: '#f57f17', fontSize: '10px', padding: '1px 5px', borderRadius: '4px' }}>🥇 1위</span>}
-                        {fav.menu && <span style={{ background: '#e3f2fd', color: '#1976d2', fontSize: '10px', padding: '1px 5px', borderRadius: '4px' }}>🥘 {fav.menu}</span>}
+                        {fav.menu && <span style={{ background: '#e3f2fd', color: '#1976d2', fontSize: '10px', padding: '1px 5px', borderRadius: '4px' }}>
+                          🥘 {fav.menu.split(',')[0].trim()}
+                        </span>}
                       </h3>
 
                       <button
@@ -421,7 +418,6 @@ function App() {
                       
                       <div className="place-actions" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
   
-                        {/* 1. 가장 중요한 등록/해제 버튼을 크고 넓게 1순위로 배치 */}
                         <button 
                           onClick={() => toggleFavorite(place)}
                           style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: 'bold', background: isFav ? '#ff9800' : '#4caf50', color: '#fff', border: 'none', borderRadius: '8px' }}
@@ -429,7 +425,6 @@ function App() {
                           {isFav ? '❌ 즐겨찾기 해제' : '⭐ 등록하기'}
                         </button>
 
-                        {/* 2. 상세보기와 메뉴 수정은 그 아래에 반반씩 큼직하게 배치 */}
                         <div style={{ display: 'flex', gap: '10px' }}>
                           <button 
                             onClick={() => showPlaceInfo(place)} 
@@ -443,7 +438,7 @@ function App() {
                               onClick={() => editMenu(String(place.id), isFav.menu, place.place_name)} 
                               style={{ flex: 1, padding: '12px', fontSize: '14px', fontWeight: 'bold', background: '#2196f3', color: 'white', border: 'none', borderRadius: '8px' }}
                             >
-                              ✏️ 메뉴 수정
+                              ✏️ 메뉴/태그 수정
                             </button>
                           )}
                         </div>
@@ -478,9 +473,11 @@ function App() {
                         onClick={() => handleFavoriteClick(fav)}
                         style={{ background: 'white', padding: '6px 12px', borderRadius: '20px', border: '1px solid #ffcc80', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}
                       >
-                        <span style={{ fontWeight: 'bold' }}>
+                        <span style={{ fontWeight: 'bold', color: '#111' }}>
                           {fav.place_name} 
-                          {fav.menu && <span style={{ color: '#888', fontWeight: 'normal', marginLeft: '4px' }}>({fav.menu})</span>}
+                          {fav.menu && <span style={{ color: '#888', fontWeight: 'normal', marginLeft: '4px' }}>
+                            ({fav.menu.split(',')[0].trim()})
+                          </span>}
                         </span>
                         
                         <button 
