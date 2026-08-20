@@ -21,6 +21,19 @@ const getMyUserId = () => {
   return uid
 }
 
+// ✅ 매일 초기화를 위한 KST(한국시간) 기준 "오늘" 범위 계산
+const getKSTDayRange = () => {
+  const now = new Date()
+  const kstNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
+  const year = kstNow.getFullYear()
+  const month = kstNow.getMonth()
+  const date = kstNow.getDate()
+  // KST 00:00 = UTC 전날 15:00 이므로 UTC 기준 시(hour)에 -9를 주면 JS가 알아서 날짜 보정을 해줌
+  const startUTC = new Date(Date.UTC(year, month, date, -9, 0, 0))
+  const endUTC = new Date(Date.UTC(year, month, date + 1, -9, 0, 0))
+  return { start: startUTC.toISOString(), end: endUTC.toISOString() }
+}
+
 function App() {
   const [view, setView] = useState('vote') 
   const [isMapLoaded, setIsMapLoaded] = useState(false)
@@ -72,8 +85,14 @@ function App() {
     if (data) setFavorites(data)
   }
 
+  // ✅ 오늘(KST) 생성된 투표만 조회 → 자정이 지나면 자동으로 0표부터 다시 시작
   const fetchVotes = async () => {
-    const { data } = await supabase.from('votes').select('*')
+    const { start, end } = getKSTDayRange()
+    const { data } = await supabase
+      .from('votes')
+      .select('*')
+      .gte('created_at', start)
+      .lt('created_at', end)
     if (data) setVotes(data)
   }
 
@@ -259,8 +278,8 @@ function App() {
   // =====================================================
   return (
     <div className="app">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ margin: 0, fontSize: '24px' }}>🍚 {view === 'vote' ? '오늘 뭐 먹지?' : '맛집 즐겨찾기 설정'}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <h1 style={{ margin: 0, fontSize: '22px' }}>🍚 {view === 'vote' ? '오늘 뭐 먹지?' : '맛집 즐겨찾기 설정'}</h1>
         <button 
           onClick={() => {
             setView(view === 'vote' ? 'admin' : 'vote');
@@ -279,9 +298,9 @@ function App() {
         <div className="vote-view">
           
           {totalVotes > 0 && (
-            <div style={{ background: '#222', color: 'white', padding: '16px', borderRadius: '12px', marginBottom: '20px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-              <div style={{ fontSize: '14px', marginBottom: '8px', color: '#ccc' }}>현재 총 <strong style={{ color: '#fff', fontSize: '16px' }}>{totalVotes}</strong>명 참여 중</div>
-              <div style={{ fontSize: '18px', fontWeight: 'bold', color: '#ffd700' }}>
+            <div style={{ background: '#222', color: 'white', padding: '10px 14px', borderRadius: '10px', marginBottom: '12px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+              <div style={{ fontSize: '12px', marginBottom: '4px', color: '#ccc' }}>현재 총 <strong style={{ color: '#fff', fontSize: '14px' }}>{totalVotes}</strong>명 참여 중</div>
+              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#ffd700' }}>
                 🥇 1위: {firstPlaceNames.join(', ')} ({maxVotes}표)
               </div>
             </div>
@@ -289,7 +308,7 @@ function App() {
 
           {/* 투표 화면용 맛집/메뉴 검색창 */}
           {favorites.length > 0 && (
-            <div className="search-box" style={{ marginBottom: '20px' }}>
+            <div className="search-box" style={{ marginBottom: '12px' }}>
               <input
                 type="text"
                 placeholder="🔍 식당 이름이나 메뉴(제육, 돈까스 등)를 검색해보세요"
@@ -312,7 +331,7 @@ function App() {
               <p>검색 결과가 없습니다.</p>
             </div>
           ) : (
-            <div className="results" style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingRight: '10px' }}>
+            <div className="results" style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '10px' }}>
               
               {/* 필터링 및 다중 정렬(득표순->거리순)된 리스트 출력 */}
               {displayedFavorites.map((fav) => {
@@ -323,47 +342,44 @@ function App() {
 
                 return (
                   <div key={fav.place_id} style={{ 
-                    background: 'white', padding: '16px', borderRadius: '12px', textAlign: 'left',
+                    background: 'white', padding: '10px 12px', borderRadius: '10px', textAlign: 'left',
                     border: isFirstPlace ? '2px solid #ffd700' : isMyVote ? '2px solid #2196f3' : '1px solid #e0e0e0',
-                    boxShadow: isFirstPlace ? '0 4px 12px rgba(255, 215, 0, 0.2)' : '0 2px 8px rgba(0,0,0,0.05)',
+                    boxShadow: isFirstPlace ? '0 3px 8px rgba(255, 215, 0, 0.2)' : '0 1px 4px rgba(0,0,0,0.04)',
                   }}>
                     
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
   
-                      <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                      <h3 style={{ margin: 0, fontSize: '15px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '5px' }}>
                         {fav.place_name}
-                        {isFirstPlace && <span style={{ background: '#fff9c4', color: '#f57f17', fontSize: '11px', padding: '2px 6px', borderRadius: '4px' }}>🥇 현재 1위</span>}
-                        {fav.menu && <span style={{ background: '#e3f2fd', color: '#1976d2', fontSize: '11px', padding: '2px 6px', borderRadius: '4px' }}>🥘 {fav.menu}</span>}
+                        {isFirstPlace && <span style={{ background: '#fff9c4', color: '#f57f17', fontSize: '10px', padding: '1px 5px', borderRadius: '4px' }}>🥇 1위</span>}
+                        {fav.menu && <span style={{ background: '#e3f2fd', color: '#1976d2', fontSize: '10px', padding: '1px 5px', borderRadius: '4px' }}>🥘 {fav.menu}</span>}
                       </h3>
 
-                      {/* 거리(m)를 주소 앞으로 이동 및 한 줄로 정렬 */}
-                      <p style={{ margin: '0 0 4px 0', fontSize: '13px', color: '#666' }}>
-                        🏢 {formatDistance(fav.distance)} · 📍 {fav.address}
-                      </p>
-
+                      <button
+                        onClick={() => handleVote(fav)}
+                        style={{ 
+                          flexShrink: 0, padding: '7px 12px', fontSize: '12px', fontWeight: 'bold', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                          background: isMyVote ? '#ffebee' : '#f0f8ff',
+                          color: isMyVote ? '#d32f2f' : '#1976d2',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {isMyVote ? '❌ 취소' : myCurrentVote ? '🔄 옮기기' : '👍 투표'}
+                      </button>
                     </div>
 
-                    <div style={{ background: '#f5f5f5', height: '10px', borderRadius: '5px', overflow: 'hidden', margin: '14px 0', position: 'relative' }}>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#777' }}>
+                      🏢 {formatDistance(fav.distance)} · 📍 {fav.address}
+                    </p>
+
+                    <div style={{ background: '#f0f0f0', height: '6px', borderRadius: '3px', overflow: 'hidden', position: 'relative' }}>
                       <div style={{
                         width: `${percentage}%`, height: '100%',
                         background: isFirstPlace ? '#ffd700' : (isMyVote ? '#2196f3' : '#90caf9'),
                         transition: 'width 0.4s ease-in-out'
                       }} />
-                      {percentage > 0 && <span style={{ position: 'absolute', right: '4px', top: '-1px', fontSize: '9px', color: '#333' }}>{percentage}%</span>}
                     </div>
-                    
-                    <button
-                      onClick={() => handleVote(fav)}
-                      style={{ 
-                        width: '100%', padding: '12px', fontWeight: 'bold', border: 'none', borderRadius: '8px', cursor: 'pointer',
-                        background: isMyVote ? '#ffebee' : '#f0f8ff',
-                        color: isMyVote ? '#d32f2f' : '#1976d2',
-                        transition: 'background 0.2s',
-                        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px'
-                      }}
-                    >
-                      {isMyVote ? '❌ 내 투표 취소' : myCurrentVote ? '🔄 여기로 표 옮기기' : '👍 투표하기'}
-                    </button>
+                    {percentage > 0 && <p style={{ margin: '3px 0 0 0', fontSize: '10px', color: '#999', textAlign: 'right' }}>{currentVotes}표 · {percentage}%</p>}
 
                   </div>
                 )
