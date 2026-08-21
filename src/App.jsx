@@ -84,7 +84,6 @@ function App() {
     if (data) setFavorites(data)
   }
 
-  // 오늘(KST) 생성된 투표만 조회 (자정이 지나면 자동으로 0표부터 시작)
   const fetchVotes = async () => {
     const { start, end } = getKSTDayRange()
     const { data } = await supabase
@@ -221,7 +220,7 @@ function App() {
   // 4. 투표 화면 기능 & 통계 계산
   // =====================================================
   const handleVote = async (favPlace) => {
-    const myPreviousVote = votes.find(v => v.user_id === myUserId)
+    const myPreviousVote = votes.find(v => v.user_id === myUserId && v.place_id !== 'coffee_sponsor')
     if (myPreviousVote) {
       if (myPreviousVote.place_id === favPlace.place_id) {
         await supabase.from('votes').delete().eq('id', myPreviousVote.id) 
@@ -233,39 +232,64 @@ function App() {
     }
   }
 
-  const myCurrentVote = votes.find(v => v.user_id === myUserId)
+  // 커피 쏘기 토글
+  const handleCoffeeSponsor = async () => {
+    const myCoffeeVote = votes.find(v => v.place_id === 'coffee_sponsor' && v.user_id === myUserId)
+    if (myCoffeeVote) {
+      await supabase.from('votes').delete().eq('id', myCoffeeVote.id)
+    } else {
+      const defaultName = localStorage.getItem('voter_name') || ''
+      const name = prompt('오늘 커피를 쏘실 분의 이름을 입력해 주세요!', defaultName)
+      if (name && name.trim()) {
+        const trimmedName = name.trim()
+        localStorage.setItem('voter_name', trimmedName)
+        await supabase.from('votes').insert([{
+          place_id: 'coffee_sponsor',
+          place_name: trimmedName,
+          user_id: myUserId
+        }])
+      }
+    }
+  }
 
-  // 득표수 집계
+  const myCurrentVote = votes.find(v => v.user_id === myUserId && v.place_id !== 'coffee_sponsor')
+  const coffeeSponsors = votes.filter(v => v.place_id === 'coffee_sponsor')
+  const myCoffeeVote = coffeeSponsors.find(v => v.user_id === myUserId)
+
+  // 득표수 집계 (커피 스폰서는 식당 표에서 완전 제외)
   const voteCounts = {}
-  votes.forEach(v => {
-    voteCounts[v.place_id] = (voteCounts[v.place_id] || 0) + 1
+  let skipCount = 0;
+  const foodAndSkipVotes = votes.filter(v => v.place_id !== 'coffee_sponsor')
+
+  foodAndSkipVotes.forEach(v => {
+    if (v.place_id === 'skip') {
+      skipCount++;
+    } else {
+      voteCounts[v.place_id] = (voteCounts[v.place_id] || 0) + 1
+    }
   })
   
-  const totalVotes = votes.length
-  const maxVotes = totalVotes > 0 ? Math.max(...Object.values(voteCounts)) : 0
+  const totalVotes = foodAndSkipVotes.length
+  const validTotalVotes = totalVotes - skipCount
+  const maxVotes = Object.keys(voteCounts).length > 0 ? Math.max(...Object.values(voteCounts)) : 0
 
   const firstPlaceNames = maxVotes > 0 
     ? favorites.filter(fav => voteCounts[fav.place_id] === maxVotes).map(fav => fav.place_name)
     : []
 
-  // 검색 필터(식당명 + 메뉴/태그 + 카테고리) 및 다중 정렬 (1순위: 득표수, 2순위: 거리)
+  // 검색 필터링
   const displayedFavorites = favorites
     .filter(fav => {
       const searchWord = voteKeyword.toLowerCase().trim()
-      if (!searchWord) return true
-      return (
-        fav.place_name.toLowerCase().includes(searchWord) || 
-        (fav.menu && fav.menu.toLowerCase().includes(searchWord)) ||
-        (fav.category_name && fav.category_name.toLowerCase().includes(searchWord))
-      )
+      const textToSearch = `${fav.place_name} ${fav.menu || ''} ${fav.category_name || ''}`.toLowerCase()
+      
+      if (searchWord && !textToSearch.includes(searchWord)) return false
+      return true
     })
     .sort((a, b) => {
       const aVotes = voteCounts[a.place_id] || 0
       const bVotes = voteCounts[b.place_id] || 0
-      
-      if (aVotes !== bVotes) {
-        return bVotes - aVotes
-      }
+      if (aVotes !== bVotes) return bVotes - aVotes
       return Number(a.distance) - Number(b.distance)
     })
 
@@ -274,17 +298,39 @@ function App() {
   // =====================================================
   return (
     <div className="app">
+      
+      {/* 상단 헤더 (미참 버튼 + 관리자 톱니바퀴) */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-        <h1 style={{ margin: 0, fontSize: '22px' }}>🍚 {view === 'vote' ? '오늘 뭐 먹지?' : '맛집 즐겨찾기 설정'}</h1>
-        <button 
-          onClick={() => {
-            setView(view === 'vote' ? 'admin' : 'vote');
-            setVoteKeyword(''); 
-          }}
-          style={{ padding: '8px 12px', background: '#333', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: 'bold' }}
-        >
-          {view === 'vote' ? '⚙️ 맛집 등록하기' : '◀ 투표 화면으로'}
-        </button>
+        <h1 style={{ margin: 0, fontSize: '22px' }}>🍚 {view === 'vote' ? '오늘 뭐 먹지?' : '맛집 등록'}</h1>
+        
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {view === 'vote' && (
+            <button
+              onClick={() => handleVote({ place_id: 'skip', place_name: '🚫 미참' })}
+              style={{
+                padding: '6px 12px',
+                background: myCurrentVote?.place_id === 'skip' ? '#ffebee' : '#f8f9fa',
+                color: myCurrentVote?.place_id === 'skip' ? '#d32f2f' : '#444',
+                border: myCurrentVote?.place_id === 'skip' ? '1px solid #ffcdd2' : '1px solid #ddd',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                fontSize: '13px',
+              }}
+            >
+              {myCurrentVote?.place_id === 'skip' ? '❌ 미참 취소' : '🍱 패스할게요'}
+            </button>
+          )}
+          <button 
+            onClick={() => {
+              setView(view === 'vote' ? 'admin' : 'vote');
+              setVoteKeyword(''); 
+            }}
+            style={{ padding: '6px 12px', background: '#333', color: '#fff', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '15px' }}
+          >
+            {view === 'vote' ? '⚙️' : '◀ 되돌아가기'}
+          </button>
+        </div>
       </div>
 
       {/* ---------------------------------------------------- */}
@@ -292,13 +338,51 @@ function App() {
       {/* ---------------------------------------------------- */}
       {view === 'vote' && (
         <div className="vote-view">
-          
-          {totalVotes > 0 && (
-            <div style={{ background: '#222', color: 'white', padding: '10px 14px', borderRadius: '10px', marginBottom: '12px', textAlign: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-              <div style={{ fontSize: '12px', marginBottom: '4px', color: '#ccc' }}>현재 총 <strong style={{ color: '#fff', fontSize: '14px' }}>{totalVotes}</strong>명 참여 중</div>
-              <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#ffd700' }}>
-                🥇 1위: {firstPlaceNames.join(', ')} ({maxVotes}표)
+
+          {/* ✅ 우측에 [☕ 제가 쏠게요!] 버튼이 통합된 1위 / 총 참여자 현황판 */}
+          {favorites.length > 0 && (
+            <div style={{ 
+              background: '#222', color: 'white', padding: '10px 14px', borderRadius: '10px', marginBottom: '12px', 
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', 
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)' 
+            }}>
+              <div style={{ textAlign: 'left', flex: 1 }}>
+                {maxVotes > 0 ? (
+                  <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#ffd700', marginBottom: '2px' }}>
+                    🥇 1위: {firstPlaceNames.join(', ')} ({maxVotes}표)
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '13px', color: '#aaa', marginBottom: '2px' }}>식당 투표 진행 중...</div>
+                )}
+                
+                <div style={{ fontSize: '12px', color: '#ccc' }}>
+                  총 <strong style={{ color: '#fff' }}>{totalVotes}</strong>명 참여 중
+                  {skipCount > 0 && <span style={{ color: '#ffcc80', marginLeft: '4px' }}>(미참 {skipCount}명)</span>}
+                  {coffeeSponsors.length > 0 && (
+                    <span style={{ color: '#ffb74d', marginLeft: '6px', fontWeight: 'bold' }}>
+                      · ☕ {coffeeSponsors.map(s => s.place_name).join(', ')} 님이 쏩니다!
+                    </span>
+                  )}
+                </div>
               </div>
+
+              <button
+                onClick={handleCoffeeSponsor}
+                style={{
+                  padding: '7px 10px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  background: myCoffeeVote ? '#e65100' : '#ff9800',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0
+                }}
+              >
+                {myCoffeeVote ? '☕ 쏘기 취소' : '☕ 제가 쏠게요!'}
+              </button>
             </div>
           )}
 
@@ -307,10 +391,10 @@ function App() {
             <div className="search-box" style={{ marginBottom: '12px' }}>
               <input
                 type="text"
-                placeholder="🔍 식당, 메뉴, 또는 태그(해장, 가성비 등) 검색"
+                placeholder="🔍 식당, 메뉴 검색"
                 value={voteKeyword}
                 onChange={(e) => setVoteKeyword(e.target.value)}
-                style={{ background: '#fff' }}
+                style={{ background: '#fff', padding: '12px' }}
               />
             </div>
           )}
@@ -324,16 +408,18 @@ function App() {
             </div>
           ) : displayedFavorites.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px', background: '#f8f9fa', borderRadius: '12px', color: '#888' }}>
-              <p>검색 결과가 없습니다.</p>
+              <p>검색 결과가 없습니다. 😢</p>
             </div>
           ) : (
             <div className="results" style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingRight: '10px' }}>
               
               {displayedFavorites.map((fav) => {
                 const currentVotes = voteCounts[fav.place_id] || 0
-                const percentage = totalVotes > 0 ? Math.round((currentVotes / totalVotes) * 100) : 0
+                const percentage = validTotalVotes > 0 ? Math.round((currentVotes / validTotalVotes) * 100) : 0
                 const isMyVote = myCurrentVote?.place_id === fav.place_id
                 const isFirstPlace = maxVotes > 0 && currentVotes === maxVotes
+                
+                const kakaoPlaceUrl = `https://place.map.kakao.com/${fav.place_id}`
 
                 return (
                   <div key={fav.place_id} style={{ 
@@ -345,7 +431,17 @@ function App() {
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
   
                       <h3 style={{ margin: 0, fontSize: '15px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '5px' }}>
-                        {fav.place_name}
+                        <a 
+                          href={kakaoPlaceUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          style={{ color: '#111', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                          title="카카오맵 메뉴/후기 보기"
+                        >
+                          {fav.place_name}
+                          <span style={{ fontSize: '12px', color: '#888' }}>🔗</span>
+                        </a>
+                        
                         {isFirstPlace && <span style={{ background: '#fff9c4', color: '#f57f17', fontSize: '10px', padding: '1px 5px', borderRadius: '4px' }}>🥇 1위</span>}
                         {fav.menu && <span style={{ background: '#e3f2fd', color: '#1976d2', fontSize: '10px', padding: '1px 5px', borderRadius: '4px' }}>
                           🥘 {fav.menu.split(',')[0].trim()}
